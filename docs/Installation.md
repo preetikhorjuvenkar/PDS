@@ -151,3 +151,56 @@ In case any of the parameters are updated, the server has to be restarted:
 
         sudo service pds start
 
+# Monitoring PDS application
+
+We have 2 PDS setups running. The details can be seen in the table below. The PDS tool is hosted on docker containers on VMs.
+
+
+|    PDS		 |				URL			 			 |			VM				 |		Container name          |
+| -------------- |  ------------------------------------ | ------------------------- | ---------------------------- |
+|  External PDS  |	 http://148.100.110.182:80/pds/ 	 |	148.100.110.182	         |       pds_v143_opensource_live1                       |
+|				 |                                       |                           |                              |
+|  Internal PDS  |	http://pds.pok.stglabs.ibm.com/pds	 |	ecos0044 (9.47.71.241) & |	pds_live_internal_prod_v143 |
+|				 |										 |	ecos0042 (9.47.69.130)	 |	pds_live_internal_prod_v143 |
+
+_**Note:**_ The Internal PDS setup has two containers associated with it. In case the internal PDS is down, one has to check both the containers.
+
+## Actions to be taken if the PDS tool is down.
+
+Ecos0041 and Ecos0017 each have a Jenkins job named "PDS_links" which monitors the status of the PDS tools. These jobs are configured to be run every hour. In case any of the PDS tool is down, the job will fail and a notification sent onto the slack channel. Once a notification is received, perform the following actions:
+
+1. Check the log for the failed Jenkins Job to know which of the PDS link is down.
+
+    The PDS link may be down due to any of the following reasons:
+    * The VM hosting the docker container for PDS is down.
+    * The docker services on the VM are down.
+    * The docker container hosting the PDS is down.
+    * The apache services in the docker container hosting the PDS is down.
+
+2. Once the link is known, refer the table above to know the VM and container details. Then perform the following actions:
+
+   * Check if the VM is accessible. If it is not, 
+        *  contact your system administrator to get the VM up. 
+        *  Perform the next step.
+   * Check if the docker services are running on the VM using command `service docker status`.
+      If the docker service is down:
+        *  Start the docker service using command `sudo service docker start`
+        *  Verify its status using `service docker status` 
+        *  Perform the next step.
+   * Check if the docker container is up. Use command `docker ps ` to see the list of running containers. In case the docker container is down, perform the following steps:
+        *  Start the container using command `sudo docker start <container_name>`
+        *  Perform the next step.
+   * Attach to the container and check if the apache service is up, using command `ps -axf | grep apache2`. In case the apache service is down, perform the following steps:
+        *  Attach to the container using `sudo docker attach <container_name>`
+        *  Start apache service using command `apachectl restart`
+        *  Check if apache services are running using `ps -axf | grep apache2` or `apachectl status`
+  
+  ## Steps to delete the PDS stats cache and restart PDS
+   In order to delete the internal PDS stats cache, perform the following steps:
+   * Attach to the PDS container using `sudo docker attach <container_name>`
+   * Stop apache services using command `apachectl stop`. Check the status using command `apachectl status`
+   * Delete the file `pdslog.db` from `/opt/PDS/stats`.
+   * Delete the log file `pds_access.log` from `/opt/PDS/logs`.
+   * Start apache service using command `apachectl restart`
+   * Check if apache services are running using `ps -axf | grep apache2` or `apachectl status`
+
